@@ -7,14 +7,10 @@ import (
 	"github.com/Umbrasyl/pokedex/utils/pokecache"
 )
 
-type cliCommand struct {
-	name        string
-	description string
-	Callback    func(args []string)
-}
-
 var Commands map[string]cliCommand
 var Cache = pokecache.NewCache(2 * time.Minute)
+
+var caughtPokemon map[string]Pokemon = make(map[string]Pokemon)
 
 func init() {
 	Commands = map[string]cliCommand{
@@ -59,6 +55,35 @@ func init() {
 					return
 				}
 				Explore(args[0])
+			},
+		},
+		"catch": {
+			name:        "catch",
+			description: "Give a pokemon name to try catching it",
+			Callback: func(args []string) {
+				if len(args) == 0 {
+					fmt.Println("Please provide a pokemon name")
+					return
+				}
+				Catch(args[0])
+			},
+		},
+		"inspect": {
+			name:        "inspect",
+			description: "Get information about the pokemon you have caught",
+			Callback: func(args []string) {
+				if len(args) == 0 {
+					fmt.Println("Please provide a pokemon name")
+					return
+				}
+				Inspect(args[0])
+			},
+		},
+		"pokedex": {
+			name:        "pokedex",
+			description: "List all the pokemon you have caught",
+			Callback: func(args []string) {
+				Pokedex()
 			},
 		},
 	}

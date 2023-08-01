@@ -4,75 +4,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math/rand"
 	"net/http"
 	"strings"
 
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 )
-
-type locations struct {
-	Count    int    `json:"count"`
-	Next     string `json:"next"`
-	Previous any    `json:"previous"`
-	Results  []struct {
-		Name string `json:"name"`
-		URL  string `json:"url"`
-	} `json:"results"`
-}
-
-type area struct {
-	ID                   int    `json:"id"`
-	Name                 string `json:"name"`
-	GameIndex            int    `json:"game_index"`
-	EncounterMethodRates []struct {
-		EncounterMethod struct {
-			Name string `json:"name"`
-			URL  string `json:"url"`
-		} `json:"encounter_method"`
-		VersionDetails []struct {
-			Rate    int `json:"rate"`
-			Version struct {
-				Name string `json:"name"`
-				URL  string `json:"url"`
-			} `json:"version"`
-		} `json:"version_details"`
-	} `json:"encounter_method_rates"`
-	Location struct {
-		Name string `json:"name"`
-		URL  string `json:"url"`
-	} `json:"location"`
-	Names []struct {
-		Name     string `json:"name"`
-		Language struct {
-			Name string `json:"name"`
-			URL  string `json:"url"`
-		} `json:"language"`
-	} `json:"names"`
-	PokemonEncounters []struct {
-		Pokemon struct {
-			Name string `json:"name"`
-			URL  string `json:"url"`
-		} `json:"pokemon"`
-		VersionDetails []struct {
-			Version struct {
-				Name string `json:"name"`
-				URL  string `json:"url"`
-			} `json:"version"`
-			MaxChance        int `json:"max_chance"`
-			EncounterDetails []struct {
-				MinLevel        int   `json:"min_level"`
-				MaxLevel        int   `json:"max_level"`
-				ConditionValues []any `json:"condition_values"`
-				Chance          int   `json:"chance"`
-				Method          struct {
-					Name string `json:"name"`
-					URL  string `json:"url"`
-				} `json:"method"`
-			} `json:"encounter_details"`
-		} `json:"version_details"`
-	} `json:"pokemon_encounters"`
-}
 
 var Mapper func(int) = func() func(int) {
 	// The function use closures to keep track of the current page
@@ -91,7 +29,7 @@ var Mapper func(int) = func() func(int) {
 			Cache.UpdateTime(url)
 		} else {
 			// If the data is not found in the cache, fetch it from the API
-			fetchedData, err := getLocations(url)
+			fetchedData, err := getResource(url)
 			data = fetchedData
 			if err != nil {
 				fmt.Println(err)
@@ -100,7 +38,7 @@ var Mapper func(int) = func() func(int) {
 			// Add the fetchedData to the cache
 			Cache.Add(url, fetchedData)
 		}
-		var locations locations
+		var locations Locations
 		err := json.Unmarshal(data, &locations)
 		if err != nil {
 			fmt.Println("Couldn't get the location: ", err)
@@ -126,7 +64,7 @@ func printLocations(locations []struct {
 }
 
 // getLocations should fetch the data and return it as a []byte
-func getLocations(url string) ([]byte, error) {
+func getResource(url string) ([]byte, error) {
 	// Make a GET request to the API
 	resp, err := http.Get(url)
 	if err != nil {
@@ -154,7 +92,7 @@ func Explore(areaName string) {
 		Cache.UpdateTime(url)
 	} else {
 		// If the data is not found in the cache, fetch it from the API
-		fetchedData, err := getArea(url)
+		fetchedData, err := getResource(url)
 		data = fetchedData
 		if err != nil {
 			fmt.Println(err)
@@ -163,33 +101,81 @@ func Explore(areaName string) {
 		// Add the fetchedData to the cache
 		Cache.Add(url, fetchedData)
 	}
-	var area area
+	var area Area
 	err := json.Unmarshal(data, &area)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
-	printArea(area)
-}
-
-func printArea(area area) {
 	for _, encounter := range area.PokemonEncounters {
 		fmt.Println(" - " + encounter.Pokemon.Name)
 	}
 }
 
-func getArea(url string) ([]byte, error) {
-	// Make a GET request to the API
-	resp, err := http.Get(url)
-	if err != nil {
-		return nil, err
+func Catch(pokemonName string) {
+	// The url looks like https://pokeapi.co/api/v2/pokemon/{id or name}/
+	// First check the cache for the data
+	fmt.Println("Throwing a ball at", pokemonName)
+	url := "https://pokeapi.co/api/v2/pokemon/" + pokemonName + "/"
+	data, ok := Cache.Get(url)
+	if ok {
+		// If the data is found in the cache, unmarshal it into the pokemon struct
+		Cache.UpdateTime(url)
+	} else {
+		// If the data is not found in the cache, fetch it from the API
+		fetchedData, err := getResource(url)
+		data = fetchedData
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+		// Add the fetchedData to the cache
+		Cache.Add(url, fetchedData)
 	}
-	// Close the response body when the function returns
-	defer resp.Body.Close()
-	// Read the response body into a byte slice
-	body, err := io.ReadAll(resp.Body)
+	var pokemon Pokemon
+	err := json.Unmarshal(data, &pokemon)
 	if err != nil {
-		return nil, err
+		fmt.Println(err)
+		return
 	}
-	return body, nil
+	// Catching will be based on the pokemon's baseExperience and random chance
+	chanceToCatch := ((rand.Float64()*5 + 5) / 10) * (100 / float64(pokemon.BaseExperience))
+	rollToCatch := rand.Float64()
+	if rollToCatch <= chanceToCatch {
+		fmt.Println(pokemonName, "was caught!")
+		caughtPokemon[pokemonName] = pokemon
+	} else {
+		fmt.Println(pokemonName, "got away!")
+	}
+}
+
+func Inspect(pokemonName string) {
+	// This function will look at the caughtPokemon map and print the pokemon's stats if it exists
+	pokemon, ok := caughtPokemon[pokemonName]
+	if !ok {
+		fmt.Println("You don't have", pokemonName)
+		return
+	}
+	fmt.Println("Name: ", pokemon.Name)
+	fmt.Println("Height: ", pokemon.Height)
+	fmt.Println("Weight: ", pokemon.Weight)
+	fmt.Println("Stats: ")
+	fmt.Println(" - HP: ", pokemon.Stats[0].BaseStat)
+	fmt.Println(" - Attack: ", pokemon.Stats[1].BaseStat)
+	fmt.Println(" - Defense: ", pokemon.Stats[2].BaseStat)
+	fmt.Println(" - Special Attack: ", pokemon.Stats[3].BaseStat)
+	fmt.Println(" - Special Defense: ", pokemon.Stats[4].BaseStat)
+	fmt.Println(" - Speed: ", pokemon.Stats[5].BaseStat)
+	fmt.Println("Types: ")
+	for _, pokemonType := range pokemon.Types {
+		fmt.Println(" - ", pokemonType.Type.Name)
+	}
+}
+
+func Pokedex() {
+	// This function will print the names of all the pokemon that have been caught
+	fmt.Println("Pokedex:")
+	for pokemonName := range caughtPokemon {
+		fmt.Println(" - ", pokemonName)
+	}
 }
