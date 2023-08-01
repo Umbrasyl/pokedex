@@ -1,26 +1,30 @@
 package main
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/Umbrasyl/pokedex/utils/commands"
+)
 
 func main() {
-	// Buidl a REPL
-	fmt.Println(">> Welcome to the Pokedex REPL!")
-	fmt.Println(">> Type 'help' for instructions or 'exit' to quit.")
+
+	fmt.Println("Welcome to the Pokedex REPL!")
+	fmt.Println("Type 'help' for instructions or 'exit' to quit.")
 	for {
 		fmt.Printf(">> ")
 		var input string
 		fmt.Scanln(&input)
-		switch input {
-		case "exit":
-			fmt.Println("Bye!")
-			return
-		case "help":
-			fmt.Println("You can use the program by typing commands when prompted.")
-			fmt.Println("The commands are:")
-			fmt.Println("  help   - show this help message")
-			fmt.Println("  exit   - exit the program")
-		default:
-			fmt.Println("Unknown command")
+		// If the command is not found, print an error message
+		if _, ok := commands.Commands[input]; !ok {
+			fmt.Println("Unknown command - type 'help' for instructions")
+			continue
 		}
+		if input == "exit" {
+			commands.Commands[input].Callback()
+			break
+		}
+
+		commands.Commands[input].Callback()
 	}
+
 }
