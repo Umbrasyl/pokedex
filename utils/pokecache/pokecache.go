@@ -45,6 +45,17 @@ func (c *cache) Add(key string, val []byte) {
 	}
 }
 
+func (c *cache) UpdateTime(key string) {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+	entry, ok := c.entries[key]
+	if !ok {
+		return
+	}
+	entry.createdAt = time.Now()
+	c.entries[key] = entry
+}
+
 // reapLoop is a function that runs in the background (time.Ticker) and removes entries that are older than given time.Duration
 func (c *cache) reapLoop(ttl time.Duration) {
 	ticker := time.NewTicker(ttl)
@@ -56,6 +67,7 @@ func (c *cache) reapLoop(ttl time.Duration) {
 				delete(c.entries, key)
 			}
 		}
+
 		c.mutex.Unlock()
 	}
 }
